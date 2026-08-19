@@ -115,25 +115,30 @@ export function removeSelected() {
 	}
 }
 
-/** Insert a copy of every selected frame right after its source; select the copies. */
+/**
+ * Duplicate the selected frames. The copies are inserted as one contiguous
+ * block right after the last selected frame (not interleaved between the
+ * originals), and the copies become the new selection.
+ */
 export function duplicateSelected() {
 	if (!project.selectedIds.length) return;
 	const ids = new Set(project.selectedIds);
-	const result = [];
-	const newIds = [];
-	for (const f of project.frames) {
-		result.push(f);
+	const copies = [];
+	let lastSelectedIndex = -1;
+	project.frames.forEach((f, i) => {
 		if (ids.has(f.id)) {
-			const copy = { id: makeId(), imageData: cloneImageData(f.imageData), delay: f.delay };
-			result.push(copy);
-			newIds.push(copy.id);
+			lastSelectedIndex = i;
+			copies.push({
+				id: makeId(),
+				imageData: cloneImageData(f.imageData),
+				delay: f.delay
+			});
 		}
-	}
-	project.frames = result;
-	if (newIds.length) {
-		project.selectedIds = newIds;
-		project.anchorId = newIds[newIds.length - 1];
-	}
+	});
+	if (lastSelectedIndex === -1) return;
+	project.frames.splice(lastSelectedIndex + 1, 0, ...copies);
+	project.selectedIds = copies.map((c) => c.id);
+	project.anchorId = copies[copies.length - 1]?.id ?? null;
 }
 
 /** Move a single frame one step left (-1) or right (+1). */
