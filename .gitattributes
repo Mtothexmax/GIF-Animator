@@ -1,0 +1,9 @@
+* text=auto eol=lf
+
+# Binary assets
+*.woff2 binary
+*.gif binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
