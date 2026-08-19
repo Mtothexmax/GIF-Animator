@@ -1,42 +1,34 @@
-# sv
+# GIF Animator
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A Ulead GIF Animator–style tool built with **Svelte (SvelteKit)**, **Tailwind CSS** and **Google Material Symbols** — right in the browser, no editing needed.
 
-## Creating a project
+🔗 **Live demo (GitHub Pages):** https://Mtothexmax.github.io/GIF-Animator/
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Features
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- Open GIFs (correct disposal/transparency handling, per-frame delays preserved)
+- Timeline with thumbnails below the preview — each frame shows its duration in ms
+- Reorder frames by drag & drop or with the move buttons
+- Multi-select (Ctrl/Cmd+click toggles, Shift+click for a range, Ctrl+A selects all) with a **Reverse** button for the selected frames
+- Edit per-frame delay, or set all delays at once
+- Add blank frames, duplicate and delete frames
+- Import images or GIFs as new frames (multi-file supported)
+- Live playback preview with per-frame timing and loop toggle
+- Export as GIF (per-frame delays, transparency) or save/open a project (.json)
 
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.17.0 create --template minimal --no-types --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Development
 
 ```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+## Build & GitHub Pages
 
-To create a production version of your app:
+`npm run build` produces the production build in `build/`. The static site is published from the `docs/` folder (GitHub Pages → Deploy from a branch → `/docs`); run the export script to (re)generate it:
 
-```sh
-npm run build
+```powershell
+.\export.ps1
 ```
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+The export builds with the GitHub Pages base path (`/GIF-Animator/`) and copies everything into `docs/`.
