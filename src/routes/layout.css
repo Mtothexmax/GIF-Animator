@@ -1,5 +1,10 @@
+/* Material Symbols must sit in a layer *before* Tailwind's `utilities` layer,
+   so the text-sm/text-lg/... size classes on icon spans actually apply
+   (unlayered styles would otherwise override them with the font's 24px default). */
+@layer icons {
+	@import 'material-symbols/rounded.css';
+}
 @import 'tailwindcss';
-@import 'material-symbols/rounded.css';
 
 html,
 body {

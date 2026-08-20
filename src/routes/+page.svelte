@@ -12,7 +12,9 @@
 		removeSelected,
 		duplicateSelected,
 		moveSelected,
-		reverseSelected
+		reverseSelected,
+		setColors,
+		resizeProject
 	} from '$lib/frames.svelte.js';
 	import {
 		isGif,
@@ -20,8 +22,10 @@
 		loadImageAsImageData,
 		loadDataUrlAsImageData,
 		fitTo,
+		padTo,
 		imageDataToCanvas,
 		encodeFramesToGif,
+		exportFramesAsZip,
 		downloadBlob,
 		baseName
 	} from '$lib/gifUtils.js';
@@ -33,6 +37,17 @@
 	let error = $state('');
 	let errorTimer;
 	let dragOver = $state(false);
+
+	// Dialog state for the "..." menu
+	let sizeDialogOpen = $state(false);
+	let sizeW = $state(400);
+	let sizeH = $state(300);
+	let sizeScale = $state(true);
+	/** aspect-ratio lock (width / height) for the size dialog */
+	let sizeLocked = $state(true);
+	let sizeRatio = $state(1);
+	let colorsDialogOpen = $state(false);
+	let colorCount = $state(256);
 
 	function showError(message) {
 		error = message;
@@ -146,12 +161,78 @@
 	// ---- Export the timeline as a GIF ----
 	function handleExportGif() {
 		try {
-			const bytes = encodeFramesToGif(project.frames, project.width, project.height);
+			const bytes = encodeFramesToGif(project.frames, project.width, project.height, {
+				colors: project.colors,
+				loop: project.loop
+			});
 			downloadBlob(new Blob([bytes], { type: 'image/gif' }), `${baseName(project.name)}.gif`);
 		} catch (err) {
 			console.error(err);
 			showError('Could not export GIF: ' + (err?.message || err));
 		}
+	}
+
+	// ---- Export each frame as its own GIF file inside a ZIP ----
+	function handleExportFramesZip() {
+		try {
+			const blob = exportFramesAsZip(
+				project.frames,
+				project.width,
+				project.height,
+				baseName(project.name),
+				project.colors,
+				project.loop
+			);
+			downloadBlob(blob, `${baseName(project.name)}-frames.zip`);
+		} catch (err) {
+			console.error(err);
+			showError('Could not export frames: ' + (err?.message || err));
+		}
+	}
+
+	// ---- Change canvas size: scale or pad every frame to the new size ----
+	function openSizeDialog() {
+		sizeW = project.width || 400;
+		sizeH = project.height || 300;
+		sizeRatio = sizeH > 0 ? sizeW / sizeH : 1;
+		sizeScale = true;
+		sizeDialogOpen = true;
+	}
+
+	// With the aspect lock on, keep the width/height ratio when either field changes.
+	function onSizeChange(field) {
+		if (!sizeLocked) return;
+		const ratio = Number(sizeRatio) || 1;
+		if (field === 'w') {
+			const w = Number(sizeW) || 1;
+			sizeH = Math.max(1, Math.round(w / ratio));
+		} else {
+			const h = Number(sizeH) || 1;
+			sizeW = Math.max(1, Math.round(h * ratio));
+		}
+	}
+
+	function applySize() {
+		const w = Math.max(1, Math.min(4096, Math.trunc(Number(sizeW)) || project.width || 400));
+		const h = Math.max(1, Math.min(4096, Math.trunc(Number(sizeH)) || project.height || 300));
+		const frames = project.frames.map((f) => ({
+			id: f.id,
+			imageData: sizeScale ? fitTo(f.imageData, w, h) : padTo(f.imageData, w, h),
+			delay: f.delay
+		}));
+		resizeProject(frames, w, h);
+		sizeDialogOpen = false;
+	}
+
+	// ---- Change the max color count used for GIF export ----
+	function openColorsDialog() {
+		colorCount = project.colors;
+		colorsDialogOpen = true;
+	}
+
+	function applyColors() {
+		setColors(colorCount);
+		colorsDialogOpen = false;
 	}
 
 	// ---- Save the project as JSON (frames as PNG data URLs + delays) ----
@@ -208,6 +289,9 @@
 		onReverse={reverseSelected}
 		onExportGif={handleExportGif}
 		onSaveProject={handleSaveProject}
+		onExportFramesZip={handleExportFramesZip}
+		onChangeSize={openSizeDialog}
+		onChangeColors={openColorsDialog}
 	/>
 
 	{#if error}
@@ -267,4 +351,95 @@
 			e.currentTarget.value = '';
 		}}
 	/>
+
+	{#if sizeDialogOpen}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+			<div class="w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+				<h2 class="mb-3 text-sm font-semibold text-slate-800">Change size</h2>
+				<div class="mb-3 flex items-end gap-2">
+					<label class="flex flex-1 flex-col gap-1 text-xs text-slate-500">
+						Width
+						<input
+							type="number"
+							min="1"
+							max="4096"
+							bind:value={sizeW}
+							oninput={() => onSizeChange('w')}
+							class="rounded border border-slate-300 px-2 py-1 text-sm focus:border-sky-400 focus:outline-none"
+						/>
+					</label>
+					<button
+						class="icon-btn mb-0.5"
+						style={sizeLocked ? 'color:#fff;background-color:#0ea5e9;' : ''}
+						title={sizeLocked
+							? 'Aspect ratio locked — unlock to edit freely'
+							: 'Aspect ratio unlocked — lock to keep proportions'}
+						onclick={() => (sizeLocked = !sizeLocked)}
+					>
+						<span class="material-symbols-rounded text-base leading-none">{sizeLocked ? 'link' : 'link_off'}</span>
+					</button>
+					<label class="flex flex-1 flex-col gap-1 text-xs text-slate-500">
+						Height
+						<input
+							type="number"
+							min="1"
+							max="4096"
+							bind:value={sizeH}
+							oninput={() => onSizeChange('h')}
+							class="rounded border border-slate-300 px-2 py-1 text-sm focus:border-sky-400 focus:outline-none"
+						/>
+					</label>
+				</div>
+				<label class="mb-4 flex items-center gap-2 text-xs text-slate-600">
+					<input type="checkbox" bind:checked={sizeScale} class="h-4 w-4 accent-sky-500" />
+					Scale frame content (unchecked: keep content, transparent padding)
+				</label>
+				<div class="flex justify-end gap-2">
+					<button
+						class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+						onclick={() => (sizeDialogOpen = false)}
+					>
+						Cancel
+					</button>
+					<button
+						class="rounded bg-sky-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-sky-400"
+						onclick={applySize}
+					>
+						Apply
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if colorsDialogOpen}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+			<div class="w-72 rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+				<h2 class="mb-1 text-sm font-semibold text-slate-800">Number of colors</h2>
+				<p class="mb-3 text-xs text-slate-500">Max colors used when exporting GIF files.</p>
+				<select
+					bind:value={colorCount}
+					class="w-full rounded border border-slate-300 px-2 py-1.5 text-sm focus:border-sky-400 focus:outline-none"
+				>
+					{#each [2, 4, 8, 16, 32, 64, 128, 256] as n}
+						<option value={n}>{n} colors</option>
+					{/each}
+				</select>
+				<div class="mt-4 flex justify-end gap-2">
+					<button
+						class="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+						onclick={() => (colorsDialogOpen = false)}
+					>
+						Cancel
+					</button>
+					<button
+						class="rounded bg-sky-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-sky-400"
+						onclick={applyColors}
+					>
+						Apply
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>

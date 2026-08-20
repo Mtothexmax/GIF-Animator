@@ -55,7 +55,7 @@
 		</span>
 	</div>
 
-	<div class="flex h-44 items-stretch gap-2 overflow-x-auto p-3">
+	<div class="flex h-48 items-stretch gap-2 overflow-x-auto p-3">
 		{#if project.frames.length === 0}
 			<div class="flex flex-1 items-center justify-center text-sm text-slate-400">
 				No frames yet — open a GIF, import images, or click “Add Frame”.

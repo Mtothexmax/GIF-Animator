@@ -1,5 +1,6 @@
 import { parseGIF, decompressFrames } from 'gifuct-js';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import { zipSync } from 'fflate';
 
 /** True if the file is a GIF (by MIME type or extension). */
 export function isGif(file) {
@@ -139,6 +140,22 @@ export function fitTo(imageData, width, height) {
 	return ctx.getImageData(0, 0, width, height);
 }
 
+/**
+ * Place an ImageData on a width x height canvas at its original size
+ * (top-left), keeping the content unscaled and filling the rest with
+ * transparency ("canvas size" change). Returns the same object when the
+ * size already matches.
+ */
+export function padTo(imageData, width, height) {
+	if (imageData.width === width && imageData.height === height) return imageData;
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	const ctx = canvas.getContext('2d', { willReadFrequently: true });
+	ctx.drawImage(imageDataToCanvas(imageData), 0, 0);
+	return ctx.getImageData(0, 0, width, height);
+}
+
 /** True if the RGBA buffer contains any non-opaque pixel. */
 function hasAlpha(data) {
 	for (let i = 3; i < data.length; i += 4) {
@@ -150,9 +167,11 @@ function hasAlpha(data) {
 /**
  * Encode frames (each with per-frame delay in ms) into a GIF file's bytes.
  * Frames with transparency use a 1-bit-alpha palette; opaque frames use a
- * higher-quality rgb565 palette. Loops forever.
+ * higher-quality rgb565 palette.
+ * @param {number} [opts.colors=256] max palette size (power of two, 2..256)
+ * @param {boolean} [opts.loop=true] write the Netscape loop extension (repeat forever)
  */
-export function encodeFramesToGif(frames, width, height) {
+export function encodeFramesToGif(frames, width, height, { colors = 256, loop = true } = {}) {
 	const gif = GIFEncoder();
 	let first = true;
 
@@ -173,7 +192,7 @@ export function encodeFramesToGif(frames, width, height) {
 					prepped[i + 2] = 0;
 				}
 			}
-			palette = quantize(prepped, 256, { format: 'rgba4444', oneBitAlpha: true });
+			palette = quantize(prepped, colors, { format: 'rgba4444', oneBitAlpha: true });
 			index = applyPalette(prepped, palette, 'rgba4444');
 			const transparentIndex = palette.findIndex((c) => c.length > 3 && c[3] === 0);
 			opts = {
@@ -183,13 +202,13 @@ export function encodeFramesToGif(frames, width, height) {
 				transparentIndex: transparentIndex >= 0 ? transparentIndex : 0
 			};
 		} else {
-			palette = quantize(data, 256);
+			palette = quantize(data, colors);
 			index = applyPalette(data, palette);
 			opts = { palette, delay: f.delay };
 		}
 
 		if (first) {
-			opts.repeat = 0; // loop forever
+			opts.repeat = loop ? 0 : -1; // 0 = loop forever, -1 = play once
 			first = false;
 		}
 
@@ -198,6 +217,30 @@ export function encodeFramesToGif(frames, width, height) {
 
 	gif.finish();
 	return gif.bytes();
+}
+
+/**
+ * Export every frame as its own single-frame GIF file, packed into a ZIP.
+ * Files are named "<name>-frame-01.gif", zero-padded to the frame count.
+ */
+export function exportFramesAsZip(
+	frames,
+	width,
+	height,
+	name = 'animation',
+	colors = 256,
+	loop = true
+) {
+	const files = {};
+	const digits = String(frames.length).length;
+	frames.forEach((f, i) => {
+		const bytes = encodeFramesToGif([f], width, height, { colors, loop });
+		const num = String(i + 1).padStart(digits, '0');
+		// level 0 = store: GIF data is already compressed, so don't re-compress.
+		files[`${name}-frame-${num}.gif`] = [bytes, { level: 0 }];
+	});
+	const zipped = zipSync(files, { level: 0 });
+	return new Blob([zipped], { type: 'application/zip' });
 }
 
 /** Trigger a browser download of a Blob under the given file name. */

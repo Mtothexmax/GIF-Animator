@@ -13,11 +13,30 @@
 		onMoveRight,
 		onReverse,
 		onExportGif,
-		onSaveProject
+		onSaveProject,
+		onExportFramesZip,
+		onChangeSize,
+		onChangeColors
 	} = $props();
 
 	const btn =
 		'inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+
+	const menuItem =
+		'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white';
+
+	let menuOpen = $state(false);
+
+	// Close the menu when clicking the full-screen backdrop behind it.
+	function clickOutsideBackdrop(node) {
+		const handler = () => (menuOpen = false);
+		node.addEventListener('click', handler);
+		return {
+			destroy() {
+				node.removeEventListener('click', handler);
+			}
+		};
+	}
 </script>
 
 <header class="flex items-center gap-1 bg-slate-900 px-3 py-2 text-white shadow-md">
@@ -79,4 +98,88 @@
 	<button class={btn} disabled={!hasFrames()} onclick={onSaveProject} title="Save the project (frames + delays) as JSON">
 		<span class="material-symbols-rounded text-lg leading-none">save</span><span class="hidden lg:inline">Save Project</span>
 	</button>
+
+	<div class="relative">
+		<button
+			class={btn}
+			onclick={() => (menuOpen = !menuOpen)}
+			onkeydown={(e) => {
+				if (e.key === 'Escape') menuOpen = false;
+			}}
+			title="More actions"
+			aria-haspopup="menu"
+			aria-expanded={menuOpen}
+		>
+			<span class="material-symbols-rounded text-lg leading-none">more_vert</span>
+		</button>
+
+		{#if menuOpen}
+			<div class="fixed inset-0 z-40" use:clickOutsideBackdrop></div>
+			<div
+				class="absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+				role="menu"
+			>
+				<button
+					class={menuItem}
+					disabled={!hasFrames()}
+					role="menuitem"
+					onclick={() => {
+						menuOpen = false;
+						onExportFramesZip();
+					}}
+				>
+					<span class="material-symbols-rounded text-lg leading-none text-slate-400">folder_zip</span>
+					<span>Export as individual frames</span>
+				</button>
+				<div class="my-1 h-px bg-slate-100"></div>
+				<button
+					class={menuItem}
+					disabled={!hasFrames()}
+					role="menuitem"
+					onclick={() => {
+						menuOpen = false;
+						onExportGif();
+					}}
+				>
+					<span class="material-symbols-rounded text-lg leading-none text-slate-400">download</span>
+					<span>Save GIF</span>
+				</button>
+				<button
+					class={menuItem}
+					disabled={!hasFrames()}
+					role="menuitem"
+					onclick={() => {
+						menuOpen = false;
+						onSaveProject();
+					}}
+				>
+					<span class="material-symbols-rounded text-lg leading-none text-slate-400">save</span>
+					<span>Save Project</span>
+				</button>
+				<div class="my-1 h-px bg-slate-100"></div>
+				<button
+					class={menuItem}
+					role="menuitem"
+					onclick={() => {
+						menuOpen = false;
+						onChangeSize();
+					}}
+				>
+					<span class="material-symbols-rounded text-lg leading-none text-slate-400">aspect_ratio</span>
+					<span>Change size…</span>
+				</button>
+				<button
+					class={menuItem}
+					role="menuitem"
+					onclick={() => {
+						menuOpen = false;
+						onChangeColors();
+					}}
+				>
+					<span class="material-symbols-rounded text-lg leading-none text-slate-400">palette</span>
+					<span>Number of colors…</span>
+				</button>
+			</div>
+		{/if}
+	</div>
 </header>

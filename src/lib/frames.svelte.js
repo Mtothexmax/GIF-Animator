@@ -6,6 +6,8 @@ export const project = $state({
 	width: 0,
 	height: 0,
 	name: 'Untitled',
+	/** max number of colors used when exporting GIFs (2..256) */
+	colors: 256,
 	/** ids of the selected frames (click order; last entry = active frame) */
 	selectedIds: [],
 	/** anchor frame used for Shift+click range selection */
@@ -203,6 +205,20 @@ export function moveFrameTo(from, to) {
 	project.frames.splice(to, 0, f);
 }
 
+/**
+ * Move a single frame to a 0-based index (used by the editable position
+ * number on each frame card). Non-finite targets are ignored.
+ */
+export function moveFrameToIndex(id, to) {
+	if (!Number.isFinite(to)) return;
+	const from = indexOf(id);
+	if (from === -1) return;
+	to = Math.max(0, Math.min(project.frames.length - 1, Math.trunc(to)));
+	if (to === from) return;
+	const [f] = project.frames.splice(from, 1);
+	project.frames.splice(to, 0, f);
+}
+
 /** Set one frame's delay (ms). */
 export function setDelay(id, ms) {
 	const f = project.frames.find((x) => x.id === id);
@@ -262,6 +278,47 @@ export function clearSelection() {
 	project.anchorId = null;
 }
 
+const COLOR_LEVELS = [2, 4, 8, 16, 32, 64, 128, 256];
+
+/** Set the max color count used for GIF export (snaps to the nearest power of two). */
+export function setColors(n) {
+	const v = Number(n);
+	if (!Number.isFinite(v) || v <= 0) return;
+	project.colors = COLOR_LEVELS.reduce(
+		(best, a) => (Math.abs(a - v) < Math.abs(best - v) ? a : best),
+		256
+	);
+}
+
+/**
+ * Replace the frames and canvas size (e.g. after a size change), keeping the
+ * selection and playback position intact.
+ */
+export function resizeProject(newFrames, width, height) {
+	project.frames = newFrames;
+	project.width = width;
+	project.height = height;
+	if (project.frames.length === 0) {
+		project.selectedIds = [];
+		project.anchorId = null;
+		project.currentIndex = 0;
+		project.playing = false;
+	} else if (project.currentIndex >= project.frames.length) {
+		project.currentIndex = project.frames.length - 1;
+	}
+}
+
 export function togglePlay() {
+	// Loop off + sitting on the last frame: restart from the beginning when
+	// pressing play (the animation is finished, so starting there again would
+	// otherwise do nothing). With loop on, playback just continues/loops.
+	if (
+		!project.playing &&
+		!project.loop &&
+		project.frames.length > 1 &&
+		project.currentIndex >= project.frames.length - 1
+	) {
+		project.currentIndex = 0;
+	}
 	project.playing = !project.playing;
 }

@@ -1,5 +1,11 @@
 <script>
-	import { moveFrame, removeFrame, setDelay, selectFrame } from '$lib/frames.svelte.js';
+	import {
+		moveFrame,
+		moveFrameToIndex,
+		removeFrame,
+		setDelay,
+		selectFrame
+	} from '$lib/frames.svelte.js';
 
 	let {
 		frame,
@@ -32,6 +38,23 @@
 		else selectFrame(frame.id);
 	}
 
+	// Editable position number: type a 1-based position and press Enter/blur to
+	// move this frame to that spot.
+	function onPositionChange(e) {
+		const input = e.currentTarget;
+		const to = input.valueAsNumber - 1;
+		if (!Number.isFinite(to) || to === i) {
+			input.value = i + 1; // revert invalid input
+			return;
+		}
+		moveFrameToIndex(frame.id, to);
+	}
+
+	function onPositionKeydown(e) {
+		e.stopPropagation();
+		if (e.key === 'Enter') e.currentTarget.blur();
+	}
+
 	// Draw a fitted thumbnail whenever the frame's pixels change.
 	$effect(() => {
 		const el = thumb;
@@ -51,7 +74,7 @@
 </script>
 
 <div
-	class="group relative flex w-32 shrink-0 flex-col items-center rounded-md border bg-white pb-1 shadow-sm transition-all {borderClass}"
+	class="group relative flex w-32 shrink-0 flex-col items-center overflow-hidden rounded-md border bg-white pb-1 shadow-sm transition-all {borderClass}"
 	class:opacity-50={dragFrom}
 	class:bg-sky-50={isCurrent}
 	class:ring-1={isCurrent}
@@ -68,10 +91,17 @@
 	ondrop={ondrop}
 	ondragend={ondragend}
 >
-	<span
-		class="absolute left-1 top-1 z-10 rounded bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
-	>{i + 1}</span
-	>
+	<input
+		type="number"
+		min="1"
+		max="99999"
+		value={i + 1}
+		class="absolute left-1 top-1 z-10 w-9 rounded bg-slate-900/80 px-1 py-0.5 text-center text-[10px] font-semibold leading-none text-white outline-none transition-colors hover:bg-slate-900 focus:bg-sky-600"
+		title="Frame position — type a number and press Enter to move this frame there"
+		onclick={(e) => e.stopPropagation()}
+		onchange={onPositionChange}
+		onkeydown={onPositionKeydown}
+	/>
 
 	{#if isCurrent}
 		<span class="material-symbols-rounded absolute right-1 top-1 z-10 text-sm text-sky-500" title="Playing now">play_circle</span>
@@ -79,8 +109,8 @@
 		<span class="material-symbols-rounded absolute right-1 top-1 z-10 text-sm text-sky-600" title="Selected">check_circle</span>
 	{/if}
 
-	<div class="mt-2 flex h-[104px] w-full items-center justify-center">
-		<canvas bind:this={thumb} class="checkerboard max-h-[104px] max-w-[104px] shadow ring-1 ring-slate-200"></canvas>
+	<div class="mt-2 flex h-[96px] w-full items-center justify-center">
+		<canvas bind:this={thumb} class="checkerboard max-h-[96px] max-w-[96px] shadow ring-1 ring-slate-200"></canvas>
 	</div>
 
 	<div class="mt-1 flex w-full items-center justify-center gap-0.5 px-1">
@@ -98,7 +128,7 @@
 		<span class="text-[10px] text-slate-400">ms</span>
 	</div>
 
-	<div class="mt-1 flex items-center gap-0.5">
+	<div class="mt-1 flex w-full items-center justify-center gap-0.5 px-1">
 		<button
 			class="icon-btn"
 			title="Move frame left"

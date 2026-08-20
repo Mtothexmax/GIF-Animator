@@ -37,11 +37,9 @@
 
 		<button
 			class="icon-btn"
-			title="Loop playback"
+			style={project.loop ? 'color:#fff;background-color:#0ea5e9;' : ''}
+			title="Loop playback — also written into the exported GIF"
 			onclick={() => (project.loop = !project.loop)}
-			class:bg-sky-500={project.loop}
-			class:text-white={project.loop}
-			class:hover:bg-sky-400={project.loop}
 		>
 			<span class="material-symbols-rounded text-base leading-none">autorenew</span>
 		</button>
